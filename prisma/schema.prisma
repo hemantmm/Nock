@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String     @id
+  email        String     @unique
+  name         String?
+  passwordHash String?
+  githubId     String?    @unique
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  endpoints    Endpoint[]
+  sessions     Session[]
+  apiTokens    ApiToken[]
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  csrfToken String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model ApiToken {
+  id           String    @id
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  tokenHash    String    @unique
+  tokenPreview String
+  lastUsedAt   DateTime?
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Endpoint {
+  id                  String   @id
+  ownerTokenHash      String
+  userId              String?
+  user                User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                String
+  responseStatus      Int      @default(200)
+  responseBody        String   @default("{\"received\":true}")
+  responseContentType String   @default("application/json; charset=utf-8")
+  signingProvider     String?
+  signingSecretEnc    String?
+  signingHeader       String?
+  signingEncoding     String   @default("hex")
+  timestampHeader     String?
+  toleranceSeconds    Int      @default(300)
+  retentionDays       Int      @default(7)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  events              Event[]
+
+  @@index([userId])
+}
+
+model Event {
+  id                 String   @id
+  endpointId         String
+  endpoint           Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  method             String
+  path               String
+  query              Json
+  headers            Json
+  headersText        String   @db.Text
+  body               Bytes
+  bodyText           String?  @db.Text
+  bodySize           Int
+  bodyTruncated      Boolean  @default(false)
+  contentType        String?
+  sourceIp           String?
+  responseStatus     Int
+  verificationStatus String?
+  verification       Json?
+  createdAt          DateTime @default(now())
+  replays            Replay[]
+
+  @@index([endpointId, createdAt(sort: Desc)])
+  @@index([endpointId, verificationStatus])
+  @@index([createdAt])
+}
+
+model Replay {
+  id                String   @id
+  eventId           String
+  event             Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  targetUrl         String
+  method            String
+  requestHeaders    Json
+  requestBody       Bytes
+  responseStatus    Int?
+  responseHeaders   Json?
+  responseBody      Bytes?
+  responseTruncated Boolean  @default(false)
+  latencyMs         Int?
+  error             String?
+  source            String   @default("replay")
+  createdAt         DateTime @default(now())
+
+  @@index([eventId, createdAt(sort: Desc)])
+}

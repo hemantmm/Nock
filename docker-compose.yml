@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hooktrace-postgres
+    environment:
+      POSTGRES_USER: hooktrace
+      POSTGRES_PASSWORD: hooktrace
+      POSTGRES_DB: hooktrace
+    ports:
+      - "54329:5432"
+    volumes:
+      - hooktrace-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hooktrace -d hooktrace"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+volumes:
+  hooktrace-pg:
