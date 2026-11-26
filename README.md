@@ -1,6 +1,6 @@
 # HookTrace
 
-Webhook deliveries are painful to debug because the thing that matters is the exact bytes on the wire, and the thing your framework shows you is a parsed object. Stripe, GitHub, and Razorpay all sign those bytes. Re-serialize the JSON, trim a newline, or use the secret from a different endpoint, and the signature fails with a message that does not say which.
+Webhook deliveries are painful to debug because the thing that matters is the exact bytes on the wire, and the thing your framework shows you is a parsed object. Providers sign those bytes. Re-serialize the JSON, trim a newline, or use the secret from a different endpoint, and the signature fails with a message that does not say which.
 
 HookTrace is a small workspace for that moment. You mint an unguessable URL, point a provider at it, and watch the raw request land. Each delivery is checked with that provider's documented scheme, and a failure says whether the header was missing, the timestamp was stale, the secret was wrong, or the body bytes changed.
 
@@ -17,13 +17,14 @@ There is no account. The endpoint id is the capability for sending. A separate o
 - Create an endpoint without signing up. The id is 144 bits of randomness. The owner token is stored in `localStorage` and sent as `Authorization: Bearer`.
 - Capture every request on `/h/:endpointId` and any subpath: method, path, query, headers, raw body (1 MB cap, truncation flagged), content type, source IP, and time. The HTTP response status and body are configurable. The default is `200` and `{"received":true}`.
 - Watch the list over server-sent events. The detail view has pretty JSON, the raw body, a headers table, and a query table. The inbox also polls every few seconds, so a split deployment still updates.
-- Replay a captured request to a URL you enter. You can edit the headers and body first. The result shows status, headers, body, and latency. Redirects are not followed.
+- Replay a captured request to a URL you enter. You can edit the method, headers, and body first. The result shows status, headers, body, and latency. Redirects are not followed.
 - Replay refuses loopback, private, link-local, and cloud-metadata addresses. `HOOKTRACE_ALLOW_PRIVATE_TARGETS=true` permits private and loopback targets on a trusted local machine. Link-local addresses, including `169.254.169.254`, stay blocked.
 - Filter history by method, response status, verification result, text in the body or headers, and time range.
 - Mask `Authorization`, cookies, signature headers, and other credential-shaped headers in the UI and in copied cURL. A switch reveals them.
 - Copy a request as a cURL command.
-- Delete events older than the endpoint's retention window (default 7 days, 1–30). An in-process hourly job runs while the Node server is up, and `POST /api/cron/cleanup` does the same for a scheduler.
-- Verify signatures for Stripe, GitHub, Razorpay, and a generic HMAC-SHA256. Each result is Valid or Invalid, with the check that failed.
+- Export up to 5,000 retained events (50 MB total raw body data) as JSON or CSV from endpoint settings.
+- Delete events older than the endpoint's retention window (default 7 days, 1–30). An in-process hourly job runs while the Node server is up, and `GET /api/cron/cleanup` handles Vercel Cron (POST remains available for manual calls).
+- Verify signatures for Stripe, GitHub, Razorpay, Shopify, Slack, Svix / Standard Webhooks, and generic HMAC-SHA256. Each result is Valid or Invalid, with the check that failed.
 
 ### Signature schemes
 
@@ -32,6 +33,9 @@ There is no account. The endpoint id is the capability for sending. A separate o
 | Stripe | `Stripe-Signature: t=<unix>,v1=<hex>` | `HMAC-SHA256(secret, "<t>.<raw body>")`. `v0` is ignored. Default tolerance is 300 seconds. An explicit tolerance of `0` disables the window, matching Stripe's libraries. |
 | GitHub | `X-Hub-Signature-256: sha256=<hex>` | `HMAC-SHA256(secret, raw body)`. The official vector is secret `It's a Secret to Everybody`, payload `Hello, World!`. A SHA-1-only delivery is reported and not accepted. |
 | Razorpay | `X-Razorpay-Signature: <hex>` | `HMAC-SHA256(secret, raw body)` as bare lowercase hex. No timestamp. |
+| Shopify | `X-Shopify-Hmac-SHA256: <base64>` | `HMAC-SHA256(secret, raw body)` as base64. |
+| Slack | `X-Slack-Signature: v0=<hex>` and `X-Slack-Request-Timestamp` | `HMAC-SHA256(secret, "v0:<timestamp>:<raw body>")`, timestamp checked against tolerance. |
+| Svix / Standard Webhooks | `svix-id`, `svix-timestamp`, `svix-signature` (or `webhook-*`) | `HMAC-SHA256(base64-decoded whsec_ key, "<id>.<timestamp>.<raw body>")`; v1 signatures and timestamp tolerance are checked. |
 | Generic | Header, encoding, and optional timestamp header you choose | Raw body, or `<timestamp>.<raw body>` when a timestamp header is set. Encoding is bare hex, `sha256=<hex>`, or standard base64. |
 
 A mismatch is not just "invalid". The verifier tries a trailing newline, CRLF versus LF, a UTF-8 BOM, and JSON re-serialization. Stripe's unsigned `payload` and `secret` debug hints are used only to explain a failure, never to mark a request valid.
@@ -181,8 +185,8 @@ HookTrace runs as a Next.js Node server plus Postgres.
 
 1. Create a Neon database and copy its pooled connection string into `DATABASE_URL`.
 2. Set `HOOKTRACE_ENCRYPTION_KEY` and `CRON_SECRET` to long random values. Keep `HOOKTRACE_ALLOW_PRIVATE_TARGETS` unset or `false`.
-3. Build command: `prisma migrate deploy && next build`. Install command can stay `npm install` (`postinstall` runs `prisma generate`).
-4. `vercel.json` schedules `POST /api/cron/cleanup` daily. Vercel sends `Authorization: Bearer $CRON_SECRET` when that env var is set.
+3. The repository's `vercel.json` runs `npm run vercel-build`, which applies `prisma migrate deploy` before the regular Next.js build. Install command can stay `npm install` (`postinstall` runs `prisma generate`).
+4. `vercel.json` schedules `GET /api/cron/cleanup` daily. Set `CRON_SECRET` in Vercel; the route checks its bearer authorization.
 5. SSE on Vercel is bounded by the function duration. The inbox reconnects, and the 3 second poll still shows new requests. For immediate multi-instance live updates, run the app as one Node process instead.
 
 **A single Node process**
@@ -195,8 +199,7 @@ Do not turn on private replay targets on a public host. A caller who can open an
 
 - No accounts, teams, or shared inboxes. Losing the owner token means losing the inbox. A future account layer would replace the browser token.
 - The CLI forwards from your machine. It does not tunnel a remote HookTrace host back to a laptop that is not running `hooktrace listen`.
-- Signature schemes cover Stripe's `v1` snapshot scheme, GitHub's SHA-256 webhook signature, Razorpay's raw-body HMAC, and a configurable HMAC. Stripe's thin `v2` events and other providers (Shopify, Slack, Svix) are not implemented.
-- The in-memory rate limiter is per process. A public deployment with many instances should move it to Redis or the database.
+- Rate-limit counters are stored atomically in Postgres, so separate serverless instances share the same limits. Expired counters are removed by cleanup.
 - DNS rebinding is checked at connect time as well as before the request, and redirects are not followed. That is the guard, not a promise against every SSRF trick.
 
 Standard methods on `/h/:endpointId` are `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, and `OPTIONS`. Next.js route handlers do not receive other methods.

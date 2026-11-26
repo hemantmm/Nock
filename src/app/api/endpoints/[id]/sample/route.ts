@@ -14,7 +14,7 @@ export async function POST(req: Request, context: RouteContext): Promise<Respons
     const { id } = await context.params;
     const endpoint = await requireEndpoint(req, id);
     if (!endpoint) return json({ error: "Endpoint not found." }, 404);
-    const limit = consumeRate(`sample:${endpoint.id}`, 30, 60_000);
+    const limit = await consumeRate(`sample:${endpoint.id}`, 30, 60_000);
     if (!limit.ok) {
       return json({ error: "Too many sample events. Wait a minute." }, 429, {
         "retry-after": String(limit.retryAfterSec),

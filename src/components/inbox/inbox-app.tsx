@@ -307,7 +307,7 @@ export function InboxApp({ endpointId }: { endpointId: string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [events, selectedId]);
 
-  async function sendSample(provider: "plain" | "stripe" | "github" | "razorpay") {
+  async function sendSample(provider: "plain" | "stripe" | "github" | "razorpay" | "shopify" | "slack" | "svix") {
     if (!token && !session) return;
     setFollow(true);
     const result = await api<{ eventId: string }>(`/api/endpoints/${endpointId}/sample`, token, {
@@ -484,6 +484,15 @@ export function InboxApp({ endpointId }: { endpointId: string }) {
                   </Button>
                   <Button type="button" size="sm" variant="outline" onClick={() => void sendSample("razorpay")}>
                     Razorpay sample
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => void sendSample("shopify")}>
+                    Shopify sample
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => void sendSample("slack")}>
+                    Slack sample
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => void sendSample("svix")}>
+                    Svix sample
                   </Button>
                 </div>
               </div>

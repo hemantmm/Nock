@@ -1,6 +1,5 @@
-type WindowCounter = { count: number; resetAt: number };
-
-const windows = new Map<string, WindowCounter>();
+import { createHash } from "node:crypto";
+import { prisma } from "./db";
 
 export type RateResult = {
   ok: boolean;
@@ -9,33 +8,39 @@ export type RateResult = {
   limit: number;
 };
 
-export function consumeRate(key: string, limit: number, windowMs: number): RateResult {
-  const now = Date.now();
-  prune(now);
-  const existing = windows.get(key);
-  if (!existing || existing.resetAt <= now) {
-    windows.set(key, { count: 1, resetAt: now + windowMs });
-    return { ok: true, remaining: Math.max(0, limit - 1), retryAfterSec: 0, limit };
-  }
-  if (existing.count >= limit) {
-    return {
-      ok: false,
-      remaining: 0,
-      retryAfterSec: Math.max(1, Math.ceil((existing.resetAt - now) / 1000)),
-      limit,
-    };
-  }
-  existing.count += 1;
-  return { ok: true, remaining: Math.max(0, limit - existing.count), retryAfterSec: 0, limit };
+type CounterRow = { count: number; resetAt: Date };
+
+/** Atomically consume a shared PostgreSQL-backed rate-limit slot. */
+export async function consumeRate(key: string, limit: number, windowMs: number): Promise<RateResult> {
+  const storedKey = createHash("sha256").update(key).digest("hex");
+  const rows = await prisma.$queryRaw<CounterRow[]>`
+    INSERT INTO "RateLimitCounter" ("key", "count", "resetAt")
+    VALUES (${storedKey}, 1, NOW() + (${windowMs} * INTERVAL '1 millisecond'))
+    ON CONFLICT ("key") DO UPDATE
+    SET
+      "count" = CASE
+        WHEN "RateLimitCounter"."resetAt" <= NOW() THEN 1
+        ELSE "RateLimitCounter"."count" + 1
+      END,
+      "resetAt" = CASE
+        WHEN "RateLimitCounter"."resetAt" <= NOW()
+          THEN NOW() + (${windowMs} * INTERVAL '1 millisecond')
+        ELSE "RateLimitCounter"."resetAt"
+      END
+    RETURNING "count", "resetAt"
+  `;
+  const row = rows[0];
+  if (!row) throw new Error("Rate-limit counter was not returned.");
+  const retryAfterSec = Math.max(1, Math.ceil((row.resetAt.getTime() - Date.now()) / 1000));
+  const ok = row.count <= limit;
+  return {
+    ok,
+    remaining: ok ? Math.max(0, limit - row.count) : 0,
+    retryAfterSec: ok ? 0 : retryAfterSec,
+    limit,
+  };
 }
 
-export function resetRateLimits(): void {
-  windows.clear();
-}
-
-function prune(now: number): void {
-  if (windows.size < 5000) return;
-  for (const [key, window] of windows) {
-    if (window.resetAt <= now) windows.delete(key);
-  }
+export async function resetRateLimits(): Promise<void> {
+  await prisma.rateLimitCounter.deleteMany();
 }

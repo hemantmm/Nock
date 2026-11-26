@@ -1,4 +1,4 @@
-export type ProviderId = "stripe" | "github" | "razorpay" | "hmac_sha256";
+export type ProviderId = "stripe" | "github" | "razorpay" | "shopify" | "slack" | "svix" | "hmac_sha256";
 
 export type SigningEncoding = "hex" | "prefixed_hex" | "base64";
 

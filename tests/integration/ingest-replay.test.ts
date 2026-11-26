@@ -36,8 +36,8 @@ describe("ingestion and replay", () => {
     await prisma.endpoint.deleteMany({ where: { name: { startsWith: "test-" } } });
   });
 
-  beforeEach(() => {
-    resetRateLimits();
+  beforeEach(async () => {
+    await resetRateLimits();
   });
 
   afterAll(async () => {

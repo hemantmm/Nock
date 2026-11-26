@@ -58,7 +58,7 @@ function authed(url: string, auth: { cookie: string; csrf: string }, init?: Requ
 }
 
 describe("accounts", () => {
-  beforeEach(() => resetRateLimits());
+  beforeEach(async () => resetRateLimits());
 
   afterAll(async () => {
     await prisma.user.deleteMany({ where: { email: { endsWith: "@hooktrace.test" } } });

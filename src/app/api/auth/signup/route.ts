@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request): Promise<Response> {
   try {
     const ip = clientIp(req) ?? "unknown";
-    const limit = consumeRate(`signup:${ip}`, 8, 60 * 60 * 1000);
+    const limit = await consumeRate(`signup:${ip}`, 8, 60 * 60 * 1000);
     if (!limit.ok) return json({ error: "Too many sign-up attempts. Try again later." }, 429);
     const body = (await readJson(req)) as { email?: string; password?: string; name?: string };
     if (!body.email || !body.password) throw new HttpError(400, "Email and password are required.");

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack -p 4317 -H 0.0.0.0",
     "build": "prisma generate && next build",
+    "vercel-build": "prisma migrate deploy && npm run build",
     "start": "next start -p 4317 -H 0.0.0.0",
     "lint": "eslint",
     "test": "prisma migrate deploy && DATABASE_URL=\"postgresql://hooktrace:hooktrace@127.0.0.1:54329/hooktrace_test?schema=public\" prisma migrate deploy && vitest run",

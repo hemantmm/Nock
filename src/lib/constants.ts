@@ -1,4 +1,4 @@
-export const PROVIDERS = ["stripe", "github", "razorpay", "hmac_sha256"] as const;
+export const PROVIDERS = ["stripe", "github", "razorpay", "shopify", "slack", "svix", "hmac_sha256"] as const;
 
 export function maxBodyBytes(): number {
   const n = Number(process.env.HOOKTRACE_MAX_BODY_BYTES ?? 1_048_576);

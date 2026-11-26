@@ -34,8 +34,11 @@ export async function replayCapturedEvent(input: {
     if (!input.headers && !input.includeSensitive && isSensitiveHeader(header.name)) return false;
     return true;
   });
-  const body =
-    input.body !== undefined ? Buffer.from(input.body, "utf8") : Buffer.from(input.event.body);
+  const body = method === "GET" || method === "HEAD"
+    ? Buffer.alloc(0)
+    : input.body !== undefined
+      ? Buffer.from(input.body, "utf8")
+      : Buffer.from(input.event.body);
 
   let outcome: ReplayOutcome;
   try {

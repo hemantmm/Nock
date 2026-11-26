@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { HttpError } from "./http";
 
-const providerSchema = z.enum(["stripe", "github", "razorpay", "hmac_sha256"]);
+const providerSchema = z.enum(["stripe", "github", "razorpay", "shopify", "slack", "svix", "hmac_sha256"]);
 const encodingSchema = z.enum(["hex", "prefixed_hex", "base64"]);
 
 const contentType = z
@@ -58,7 +58,7 @@ export const listEventsSchema = z.object({
 
 export const replaySchema = z.object({
   targetUrl: z.string().min(1).max(2000),
-  method: z.string().max(12).optional(),
+  method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]).optional(),
   headers: z
     .array(
       z.object({
@@ -73,7 +73,7 @@ export const replaySchema = z.object({
 });
 
 export const sampleSchema = z.object({
-  provider: z.enum(["plain", "stripe", "github", "razorpay"]),
+  provider: z.enum(["plain", "stripe", "github", "razorpay", "shopify", "slack", "svix"]),
 });
 
 export const forwardReportSchema = z.object({

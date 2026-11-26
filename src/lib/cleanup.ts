@@ -4,14 +4,15 @@ const globalCleanup = globalThis as typeof globalThis & {
   __hooktraceCleanup?: ReturnType<typeof setInterval>;
 };
 
-export async function cleanupExpiredEvents(): Promise<{ deleted: number }> {
+export async function cleanupExpiredEvents(): Promise<{ deleted: number; rateLimitKeysDeleted: number }> {
   const deleted = await prisma.$executeRaw`
     DELETE FROM "Event" AS e
     USING "Endpoint" AS p
     WHERE e."endpointId" = p.id
       AND e."createdAt" < NOW() - (p."retentionDays" * INTERVAL '1 day')
   `;
-  return { deleted: Number(deleted) };
+  const rateLimitKeysDeleted = await prisma.rateLimitCounter.deleteMany({ where: { resetAt: { lt: new Date() } } });
+  return { deleted: Number(deleted), rateLimitKeysDeleted: rateLimitKeysDeleted.count };
 }
 
 export function startCleanupScheduler(): void {

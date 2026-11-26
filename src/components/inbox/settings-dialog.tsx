@@ -54,6 +54,7 @@ export function SettingsDialog({
   const [retention, setRetention] = useState(String(endpoint.retentionDays));
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -109,6 +110,32 @@ export function SettingsDialog({
     window.location.reload();
   }
 
+  async function exportEvents(format: "json" | "csv") {
+    setExporting(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/endpoints/${endpointId}/events/export?format=${format}`, {
+        headers: token ? { authorization: `Bearer ${token}` } : {},
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || "Could not export events.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `hooktrace-${endpointId}-events.${format}`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not export events.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   async function destroy() {
     if (!window.confirm("Delete this endpoint and its captured requests?")) return;
     await api(`/api/endpoints/${endpointId}`, token, { method: "DELETE" });
@@ -161,6 +188,9 @@ export function SettingsDialog({
                 <SelectItem value="stripe">Stripe</SelectItem>
                 <SelectItem value="github">GitHub</SelectItem>
                 <SelectItem value="razorpay">Razorpay</SelectItem>
+                <SelectItem value="shopify">Shopify</SelectItem>
+                <SelectItem value="slack">Slack</SelectItem>
+                <SelectItem value="svix">Svix / Standard Webhooks</SelectItem>
                 <SelectItem value="hmac_sha256">Generic HMAC-SHA256</SelectItem>
               </SelectContent>
             </Select>
@@ -171,12 +201,12 @@ export function SettingsDialog({
                 type="password"
                 value={secret}
                 autoComplete="new-password"
-                placeholder={endpoint.hasSigningSecret ? "Leave blank to keep the saved secret" : "whsec_… or the webhook secret"}
+                placeholder={endpoint.hasSigningSecret ? "Leave blank to keep the saved secret" : provider === "svix" ? "whsec_…" : "Webhook signing secret"}
                 onChange={(e) => setSecret(e.target.value)}
               />
             </Field>
           )}
-          {provider === "stripe" && (
+          {["stripe", "slack", "svix"].includes(provider) && (
             <Field label="Tolerance (seconds)">
               <Input value={tolerance} inputMode="numeric" onChange={(e) => setTolerance(e.target.value)} />
             </Field>
@@ -222,6 +252,12 @@ export function SettingsDialog({
             )}
           </div>
           <div className="mt-2 flex flex-wrap gap-2 border-t pt-3">
+            <Button type="button" variant="outline" disabled={exporting} onClick={() => void exportEvents("json")}>
+              {exporting ? "Exporting…" : "Export JSON"}
+            </Button>
+            <Button type="button" variant="outline" disabled={exporting} onClick={() => void exportEvents("csv")}>
+              Export CSV
+            </Button>
             <Button type="button" variant="outline" onClick={() => void clearHistory()}>
               Clear captured requests
             </Button>

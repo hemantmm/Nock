@@ -31,7 +31,7 @@ const RAZORPAY_BODY = JSON.stringify({
   payload: { payment: { entity: { id: "pay_hooktrace_sample", amount: 50000, currency: "INR" } } },
 });
 
-export async function sendSample(endpoint: Endpoint, provider: "plain" | "stripe" | "github" | "razorpay") {
+export async function sendSample(endpoint: Endpoint, provider: "plain" | "stripe" | "github" | "razorpay" | "shopify" | "slack" | "svix") {
   const secret = signingSecretOf(endpoint).secret;
   const headers: HeaderPair[] = [{ name: "content-type", value: "application/json" }, { name: "user-agent", value: "HookTrace-Sample" }];
   let body = '{"hello":"hooktrace"}';
@@ -59,6 +59,35 @@ export async function sendSample(endpoint: Endpoint, provider: "plain" | "stripe
     if (secret) {
       const digest = createHmac("sha256", secret).update(body).digest("hex");
       headers.push({ name: "x-razorpay-signature", value: digest });
+      signed = true;
+    }
+  } else if (provider === "shopify") {
+    body = JSON.stringify({ id: 820982911946154500, email: "hooktrace@example.com", topic: "orders/create" });
+    if (secret) {
+      headers.push({ name: "x-shopify-hmac-sha256", value: createHmac("sha256", secret).update(body).digest("base64") });
+      headers.push({ name: "x-shopify-topic", value: "orders/create" });
+      signed = true;
+    }
+  } else if (provider === "slack") {
+    body = JSON.stringify({ type: "event_callback", event: { type: "message", text: "Hello from HookTrace" } });
+    if (secret) {
+      const timestamp = String(Math.floor(Date.now() / 1000));
+      const digest = createHmac("sha256", secret).update(`v0:${timestamp}:${body}`).digest("hex");
+      headers.push({ name: "x-slack-request-timestamp", value: timestamp });
+      headers.push({ name: "x-slack-signature", value: `v0=${digest}` });
+      signed = true;
+    }
+  } else if (provider === "svix") {
+    body = JSON.stringify({ type: "webhook.sample", data: { message: "Hello from HookTrace" } });
+    const keyText = secret?.startsWith("whsec_") ? secret.slice(6) : "";
+    const key = Buffer.from(keyText, "base64");
+    if (secret?.startsWith("whsec_") && key.length > 0) {
+      const id = "msg_hooktrace_sample";
+      const timestamp = String(Math.floor(Date.now() / 1000));
+      const digest = createHmac("sha256", key).update(`${id}.${timestamp}.${body}`).digest("base64");
+      headers.push({ name: "svix-id", value: id });
+      headers.push({ name: "svix-timestamp", value: timestamp });
+      headers.push({ name: "svix-signature", value: `v1,${digest}` });
       signed = true;
     }
   }

@@ -3,6 +3,9 @@ import { verifyGithub } from "./github";
 import { verifyHmac } from "./hmac";
 import { verifyRazorpay } from "./razorpay";
 import { verifyStripe } from "./stripe";
+import { verifyShopify } from "./shopify";
+import { verifySlack } from "./slack";
+import { verifySvix } from "./svix";
 
 export type VerifyInput = {
   provider: ProviderId;
@@ -48,6 +51,12 @@ export function verifyRequest(input: VerifyInput): VerificationResult {
       return verifyGithub({ body: input.body, headers: input.headers, secret: input.secret });
     case "razorpay":
       return verifyRazorpay({ body: input.body, headers: input.headers, secret: input.secret });
+    case "shopify":
+      return verifyShopify({ body: input.body, headers: input.headers, secret: input.secret });
+    case "slack":
+      return verifySlack({ body: input.body, headers: input.headers, secret: input.secret, toleranceSeconds: input.toleranceSeconds, now: input.now });
+    case "svix":
+      return verifySvix({ body: input.body, headers: input.headers, secret: input.secret, toleranceSeconds: input.toleranceSeconds, now: input.now });
     case "hmac_sha256":
       return verifyHmac({
         body: input.body,
@@ -62,4 +71,4 @@ export function verifyRequest(input: VerifyInput): VerificationResult {
   }
 }
 
-export { verifyStripe, verifyGithub, verifyRazorpay, verifyHmac };
+export { verifyStripe, verifyGithub, verifyRazorpay, verifyShopify, verifySlack, verifySvix, verifyHmac };

@@ -87,8 +87,8 @@ async function startApp() {
 }
 
 describe("CLI listen forwards a Stripe event", () => {
-  beforeEach(() => {
-    resetRateLimits();
+  beforeEach(async () => {
+    await resetRateLimits();
   });
 
   afterAll(async () => {

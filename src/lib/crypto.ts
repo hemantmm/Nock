@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-export function hmacSha256(secret: string, message: Buffer): Buffer {
+export function hmacSha256(secret: string | Buffer, message: Buffer): Buffer {
   return crypto.createHmac("sha256", secret).update(message).digest();
 }
 

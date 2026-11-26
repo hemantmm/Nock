@@ -26,7 +26,7 @@ export async function GET(req: Request): Promise<Response> {
 export async function POST(req: Request): Promise<Response> {
   try {
     const ip = clientIp(req) ?? "unknown";
-    const limit = consumeRate(`create:${ip}`, createLimit(), 60 * 60 * 1000);
+    const limit = await consumeRate(`create:${ip}`, createLimit(), 60 * 60 * 1000);
     if (!limit.ok) {
       return json(
         { error: "Too many endpoints created from this network. Try again later." },

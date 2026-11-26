@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, Minus, X } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
@@ -137,7 +137,7 @@ function SignatureCard({ verification }: { verification: EventDetail["verificati
   if (!verification) {
     return (
       <div className="mt-4 rounded-xl border border-dashed px-3 py-3 text-sm text-muted-foreground">
-        No signing secret is saved for this endpoint. Add one in settings to check Stripe, GitHub, Razorpay, or HMAC-SHA256.
+        No signing secret is saved for this endpoint. Add one in settings to check the selected provider&apos;s signature.
       </div>
     );
   }
@@ -227,6 +227,7 @@ function ReplayPanel({
   onReplayed: (event: EventDetail) => void;
 }) {
   const [targetUrl, setTargetUrl] = useState("https://example.com/webhooks");
+  const [replayMethod, setReplayMethod] = useState(event.method);
   const [editing, setEditing] = useState(false);
   const [includeSensitive, setIncludeSensitive] = useState(false);
   const [headersText, setHeadersText] = useState("");
@@ -234,6 +235,8 @@ function ReplayPanel({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const latest = event.replays[0];
+
+  useEffect(() => setReplayMethod(event.method), [event.id, event.method]);
 
   function startEditing(on: boolean) {
     setEditing(on);
@@ -249,6 +252,7 @@ function ReplayPanel({
     try {
       const payload: Record<string, unknown> = {
         targetUrl,
+        method: replayMethod,
         includeSensitive,
       };
       if (editing) {
@@ -292,6 +296,18 @@ function ReplayPanel({
         </div>
         {editing && (
           <div className="grid gap-3">
+            <div className="grid gap-1.5">
+              <Label>Request method</Label>
+              <select
+                value={replayMethod}
+                onChange={(e) => setReplayMethod(e.target.value)}
+                className="h-9 rounded-md border bg-background px-3 text-sm"
+              >
+                {["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"].map((method) => (
+                  <option key={method} value={method}>{method}</option>
+                ))}
+              </select>
+            </div>
             <p className="text-xs text-muted-foreground">
               {reveal
                 ? "The editor has the captured headers."
@@ -302,6 +318,7 @@ function ReplayPanel({
               value={body}
               onChange={(e) => setBody(e.target.value)}
               className="min-h-28 font-mono text-xs"
+              disabled={replayMethod === "GET" || replayMethod === "HEAD"}
               placeholder={event.bodyText === null ? "Binary bodies can be replayed unchanged when edit is off." : ""}
             />
           </div>
@@ -359,6 +376,9 @@ function providerLabel(provider: string): string {
   if (provider === "hmac_sha256") return "HMAC-SHA256";
   if (provider === "github") return "GitHub";
   if (provider === "razorpay") return "Razorpay";
+  if (provider === "shopify") return "Shopify";
+  if (provider === "slack") return "Slack";
+  if (provider === "svix") return "Svix / Standard Webhooks";
   return "Stripe";
 }
 

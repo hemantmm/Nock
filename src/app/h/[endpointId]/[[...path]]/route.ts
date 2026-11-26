@@ -15,7 +15,7 @@ async function ingest(req: Request, context: RouteContext): Promise<Response> {
   try {
     const { endpointId, path } = await context.params;
     const ip = clientIp(req) ?? "unknown";
-    const ipLimit = consumeRate(`ingest-ip:${ip}`, ingestIpLimit(), ingestWindowMs());
+    const ipLimit = await consumeRate(`ingest-ip:${ip}`, ingestIpLimit(), ingestWindowMs());
     if (!ipLimit.ok) return tooMany(ipLimit.retryAfterSec);
 
     if (!isEndpointId(endpointId)) {
@@ -26,7 +26,7 @@ async function ingest(req: Request, context: RouteContext): Promise<Response> {
       return Response.json({ error: "Unknown webhook endpoint." }, { status: 404 });
     }
 
-    const endpointLimit = consumeRate(`ingest:${endpoint.id}`, ingestLimit(), ingestWindowMs());
+    const endpointLimit = await consumeRate(`ingest:${endpoint.id}`, ingestLimit(), ingestWindowMs());
     if (!endpointLimit.ok) return tooMany(endpointLimit.retryAfterSec);
 
     const { bytes, truncated } = await readLimitedBody(req, maxBodyBytes());

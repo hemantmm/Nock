@@ -114,3 +114,11 @@ model Replay {
 
   @@index([eventId, createdAt(sort: Desc)])
 }
+
+model RateLimitCounter {
+  key     String   @id
+  count   Int
+  resetAt DateTime
+
+  @@index([resetAt])
+}

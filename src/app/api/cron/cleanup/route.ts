@@ -5,7 +5,7 @@ import { timingSafeEqualString } from "@/lib/crypto";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(req: Request): Promise<Response> {
+async function runCleanup(req: Request): Promise<Response> {
   try {
     const secret = process.env.CRON_SECRET;
     const header = req.headers.get("authorization") ?? "";
@@ -19,3 +19,8 @@ export async function POST(req: Request): Promise<Response> {
     return errorResponse(error);
   }
 }
+
+// Vercel Cron invokes configured cron routes with GET and supplies CRON_SECRET
+// as a bearer token. Keep POST for manual/local invocation.
+export const GET = runCleanup;
+export const POST = runCleanup;
