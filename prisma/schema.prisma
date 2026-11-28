@@ -62,9 +62,11 @@ model Endpoint {
   timestampHeader     String?
   toleranceSeconds    Int      @default(300)
   retentionDays       Int      @default(7)
+  burstThreshold      Int      @default(20)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   events              Event[]
+  alerts              Alert[]
 
   @@index([userId])
 }
@@ -89,6 +91,7 @@ model Event {
   verification       Json?
   createdAt          DateTime @default(now())
   replays            Replay[]
+  alerts             Alert[]
 
   @@index([endpointId, createdAt(sort: Desc)])
   @@index([endpointId, verificationStatus])
@@ -121,4 +124,21 @@ model RateLimitCounter {
   resetAt DateTime
 
   @@index([resetAt])
+}
+
+model Alert {
+  id         String    @id
+  endpointId String
+  endpoint   Endpoint  @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  eventId    String?
+  event      Event?    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  type       String
+  title      String
+  message    String
+  dedupeKey  String?   @unique
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([endpointId, createdAt(sort: Desc)])
+  @@index([endpointId, readAt])
 }

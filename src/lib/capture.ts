@@ -1,5 +1,6 @@
 import { Prisma, type Endpoint, type Event, type Replay } from "@prisma/client";
 import { publish } from "./bus";
+import { createAlert } from "./alerts";
 import { generateId } from "./crypto";
 import { authorizeEndpoint, signingSecretOf } from "./endpoints";
 import { prisma } from "./db";
@@ -42,8 +43,46 @@ export async function captureRequest(input: {
       verification: verification ? (verification as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
     },
   });
+  if (verification?.status === "invalid") {
+    await createAlertSafely({
+      endpointId: input.endpoint.id,
+      eventId: event.id,
+      type: "signature_failure",
+      title: "Webhook signature failed",
+      message: `${verification.provider} verification failed: ${verification.summary}`,
+    });
+  }
+  if (input.endpoint.burstThreshold > 0) {
+    try {
+      const windowStart = new Date(Date.now() - 60_000);
+      const recentCount = await prisma.event.count({
+        where: { endpointId: input.endpoint.id, createdAt: { gte: windowStart } },
+      });
+      if (recentCount >= input.endpoint.burstThreshold) {
+        const minute = Math.floor(Date.now() / 60_000);
+        await createAlert({
+          endpointId: input.endpoint.id,
+          eventId: event.id,
+          type: "traffic_burst",
+          title: "High webhook traffic",
+          message: `Received at least ${input.endpoint.burstThreshold} requests within 60 seconds.`,
+          dedupeKey: `burst:${input.endpoint.id}:${minute}`,
+        });
+      }
+    } catch (error) {
+      console.error(error instanceof Error ? `traffic alert failed: ${error.message}` : "traffic alert failed");
+    }
+  }
   publish(input.endpoint.id, { type: "event", event: toSummary(event) });
   return event;
+}
+
+async function createAlertSafely(input: Parameters<typeof createAlert>[0]): Promise<void> {
+  try {
+    await createAlert(input);
+  } catch (error) {
+    console.error(error instanceof Error ? `alert creation failed: ${error.message}` : "alert creation failed");
+  }
 }
 
 export function verifyCaptured(

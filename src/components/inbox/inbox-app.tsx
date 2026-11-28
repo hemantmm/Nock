@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Radio, Settings } from "lucide-react";
+import { ArrowLeft, Bell, Radio, Settings } from "lucide-react";
 import { Mark } from "@/components/brand";
 import { CopyButton } from "@/components/copy-button";
 import { EventDetail } from "@/components/inbox/event-detail";
+import { AlertsDialog } from "@/components/inbox/alerts-dialog";
 import { SettingsDialog } from "@/components/inbox/settings-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -62,6 +63,8 @@ export function InboxApp({ endpointId }: { endpointId: string }) {
   const [unseen, setUnseen] = useState(0);
   const [reveal, setReveal] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [alertsOpen, setAlertsOpen] = useState(false);
+  const [alertCount, setAlertCount] = useState(0);
   const [composerOpen, setComposerOpen] = useState(false);
   const [requestMethod, setRequestMethod] = useState("POST");
   const [requestPath, setRequestPath] = useState("");
@@ -187,6 +190,25 @@ export function InboxApp({ endpointId }: { endpointId: string }) {
       cancelled = true;
     };
   }, [endpointId, loadList, token, session]);
+
+  useEffect(() => {
+    if (!token && !session) return;
+    let stopped = false;
+    const refresh = async () => {
+      try {
+        const result = await api<{ unreadCount: number }>(`/api/endpoints/${endpointId}/alerts`, token);
+        if (!stopped) setAlertCount(result.unreadCount);
+      } catch {
+        // Alerts should not interrupt the request inbox if this refresh fails.
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 20_000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [endpointId, token, session]);
 
   useEffect(() => {
     if ((!token && !session) || !selectedId) {
@@ -405,6 +427,10 @@ export function InboxApp({ endpointId }: { endpointId: string }) {
           Reveal secrets
         </label>
         {hookUrl && <CopyButton value={hookUrl} label="Copy URL" />}
+        <Button type="button" variant="outline" size="icon" className="relative" onClick={() => setAlertsOpen(true)} aria-label={alertCount ? `Alerts, ${alertCount} unread` : "Alerts"}>
+          <Bell />
+          {alertCount > 0 && <span className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-4 text-destructive-foreground">{alertCount > 99 ? "99+" : alertCount}</span>}
+        </Button>
         <Button type="button" variant="outline" size="sm" onClick={() => setComposerOpen(true)}>
           Send request
         </Button>
@@ -592,6 +618,20 @@ export function InboxApp({ endpointId }: { endpointId: string }) {
             setEndpoint(saved);
             if (token) saveEndpoint({ id: saved.id, token, name: saved.name, createdAt: saved.createdAt });
             void loadList(token);
+          }}
+        />
+      )}
+
+      {endpoint && (token || session) && (
+        <AlertsDialog
+          open={alertsOpen}
+          onOpenChange={setAlertsOpen}
+          endpointId={endpointId}
+          token={token}
+          onUnreadCount={setAlertCount}
+          onSelectEvent={(eventId) => {
+            setFollow(false);
+            setSelectedId(eventId);
           }}
         />
       )}

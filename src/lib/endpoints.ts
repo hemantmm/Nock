@@ -20,6 +20,7 @@ export type EndpointUpdate = {
   timestampHeader?: string | null;
   toleranceSeconds?: number;
   retentionDays?: number;
+  burstThreshold?: number;
 };
 
 export async function createEndpoint(name?: string, userId?: string | null): Promise<{ endpoint: Endpoint; token: string }> {
@@ -106,6 +107,7 @@ export async function updateEndpoint(endpoint: Endpoint, update: EndpointUpdate)
   if (update.responseContentType !== undefined) data.responseContentType = update.responseContentType;
   if (update.toleranceSeconds !== undefined) data.toleranceSeconds = update.toleranceSeconds;
   if (update.retentionDays !== undefined) data.retentionDays = update.retentionDays;
+  if (update.burstThreshold !== undefined) data.burstThreshold = update.burstThreshold;
   if (update.signingHeader !== undefined) data.signingHeader = update.signingHeader?.trim() || null;
   if (update.signingEncoding !== undefined) data.signingEncoding = update.signingEncoding;
   if (update.timestampHeader !== undefined) data.timestampHeader = update.timestampHeader?.trim() || null;
@@ -162,6 +164,7 @@ export function presentEndpoint(endpoint: Endpoint, options?: { includeSecret?: 
     timestampHeader: endpoint.timestampHeader,
     toleranceSeconds: endpoint.toleranceSeconds,
     retentionDays: endpoint.retentionDays,
+    burstThreshold: endpoint.burstThreshold,
     createdAt: endpoint.createdAt.toISOString(),
     ...(options?.includeSecret ? { signingSecret } : {}),
   };

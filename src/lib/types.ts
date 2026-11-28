@@ -90,6 +90,17 @@ export type EndpointView = {
   timestampHeader: string | null;
   toleranceSeconds: number;
   retentionDays: number;
+  burstThreshold: number;
+  createdAt: string;
+};
+
+export type AlertView = {
+  id: string;
+  eventId: string | null;
+  type: "signature_failure" | "traffic_burst" | "replay_failure";
+  title: string;
+  message: string;
+  readAt: string | null;
   createdAt: string;
 };
 

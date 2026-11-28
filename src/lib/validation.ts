@@ -35,6 +35,7 @@ export const updateEndpointSchema = z.object({
     .optional(),
   toleranceSeconds: z.number().int().min(0).max(86_400).optional(),
   retentionDays: z.number().int().min(1).max(30).optional(),
+  burstThreshold: z.number().int().min(0).max(100_000).optional(),
 });
 
 const timeString = z

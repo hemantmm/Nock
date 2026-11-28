@@ -3,6 +3,7 @@ import http from "node:http";
 import https from "node:https";
 import { Prisma, type Event } from "@prisma/client";
 import { publish } from "./bus";
+import { createAlert } from "./alerts";
 import { generateId } from "./crypto";
 import { prisma } from "./db";
 import { isHopByHop } from "./headers";
@@ -71,6 +72,20 @@ export async function replayCapturedEvent(input: {
       error: outcome.error,
     },
   });
+  if (outcome.error || (outcome.responseStatus !== null && outcome.responseStatus >= 400)) {
+    const failureMessage = outcome.error || `The target returned HTTP ${outcome.responseStatus}.`;
+    try {
+      await createAlert({
+        endpointId: input.event.endpointId,
+        eventId: input.event.id,
+        type: "replay_failure",
+        title: "Webhook replay failed",
+        message: failureMessage.slice(0, 500),
+      });
+    } catch (error) {
+      console.error(error instanceof Error ? `alert creation failed: ${error.message}` : "alert creation failed");
+    }
+  }
   return toReplay(replay);
 }
 
@@ -102,6 +117,20 @@ export async function recordForward(input: {
       source: "forward",
     },
   });
+  if (input.error || (input.responseStatus !== null && input.responseStatus >= 400)) {
+    const failureMessage = input.error || `The target returned HTTP ${input.responseStatus}.`;
+    try {
+      await createAlert({
+        endpointId: input.event.endpointId,
+        eventId: input.event.id,
+        type: "replay_failure",
+        title: "Webhook forwarding failed",
+        message: failureMessage.slice(0, 500),
+      });
+    } catch (error) {
+      console.error(error instanceof Error ? `alert creation failed: ${error.message}` : "alert creation failed");
+    }
+  }
   publish(input.event.endpointId, { type: "refresh" });
   return toReplay(replay);
 }

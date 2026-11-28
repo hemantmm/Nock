@@ -52,6 +52,7 @@ export function SettingsDialog({
   const [timestampHeader, setTimestampHeader] = useState(endpoint.timestampHeader ?? "");
   const [tolerance, setTolerance] = useState(String(endpoint.toleranceSeconds));
   const [retention, setRetention] = useState(String(endpoint.retentionDays));
+  const [burstThreshold, setBurstThreshold] = useState(String(endpoint.burstThreshold));
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -69,6 +70,7 @@ export function SettingsDialog({
     setTimestampHeader(endpoint.timestampHeader ?? "");
     setTolerance(String(endpoint.toleranceSeconds));
     setRetention(String(endpoint.retentionDays));
+    setBurstThreshold(String(endpoint.burstThreshold));
     setError("");
   }, [open, endpoint]);
 
@@ -87,6 +89,7 @@ export function SettingsDialog({
         timestampHeader: timestampHeader.trim() || null,
         toleranceSeconds: Number(tolerance),
         retentionDays: Number(retention),
+        burstThreshold: Number(burstThreshold),
       };
       if (clearSecret) payload.signingSecret = null;
       else if (secret.trim()) payload.signingSecret = secret;
@@ -172,6 +175,9 @@ export function SettingsDialog({
               <Input value={retention} inputMode="numeric" onChange={(e) => setRetention(e.target.value)} />
             </Field>
           </div>
+          <Field label="Traffic alert threshold (requests per 60 seconds; 0 disables)">
+            <Input value={burstThreshold} inputMode="numeric" min={0} max={100000} onChange={(e) => setBurstThreshold(e.target.value)} />
+          </Field>
           <Field label="Response content type">
             <Input value={contentType} onChange={(e) => setContentType(e.target.value)} />
           </Field>
